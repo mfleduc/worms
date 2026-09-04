@@ -16,20 +16,19 @@ library("tidytable")
 library("parameters")
 #install.packages("parameters")
 
+### Table of Contents
+# 1 - File Management & Data
+# 2 - Visualizations
+# 3 - Summary Statistics
+# 4 - Model Comparisons
+# 5 - Best Fit Model & Tukey's Test
+
+### Analysis
 # 1. set up data
 # 2. visualizations
 # 3. determine best model
-# 4. use best model to run glmm
-# 5. conduct ANOVA/tueky's?
-
-
-##### QUESTIONS:
-# - do I need to find a diff best fit model for location vs sp?
-# ---- ie tweedie for sp, zigam for locations
-
-# - what do the ANOVA and tukey tests tell us relative to the glmm output?
-# ---- ie if the glmm has ** next to the items, but the anova/tukey
-#       return >0.05, does that mean the results are insigificant?
+# 4. Use model
+# 5. Conduct Tukey's
 
 ##################################################
 # 1 - FILE MANAGEMENT & DATA
@@ -84,19 +83,11 @@ comboModern = combo[combo$year >= "2000",]
 
 comboHist = combo[combo$year < "2000",]
 
-
-
 ##################################################
 # 2 - VISUALIZATIONS
 ##################################################
 
-########################### LOCATION
-
-### FIGURE - Regional Comparison of 2024 Samples
-im <- readPNG("akt1.png")
-
-im2 <- matrix(rgb(im[,,1],im[,,2],im[,,3], im[,,4] * 0.5), nrow=dim(im)[1])
-
+# Regional Distribution Intensity Boxplots
 boxplot(wfish$WHG ~ wfish$REGION,
         main="Regional Comparison of 2024 Samples",
         xlab="", ylab="Nematodes per 100g",
@@ -110,47 +101,11 @@ ggplot(wfish, aes(x=REGION, y=WHG, fill=REGION)) +
   scale_fill_manual(values=c("slateblue" , "royalblue", "purple") )
 #annotation_custom(rasterGrob(im2,  width = unit(1,"npc"),  height = unit(1,"npc")), -Inf, Inf, -Inf, Inf))
 
-grid()
-
-
-# VISUALIZATION - Half-eye for Regional Distribution
+# Half-eye for Regional Distribution
 ggplot (wfish, aes(y = REGION, x = WHG)) +
   stat_halfeye()
 
-########################################################
-
-
-### MODEL - GLMM using ziGamma
-gModelRegion = glmmTMB(
-  WHG ~ REGION + SPECIES,
-  data = wfish,
-  ziformula = ~.,
-  family=ziGamma("log"),
-)
-print(summary(gModelRegion),show.residuals=TRUE)
-
-gMRanova_table_zipart = glmmTMB:::Anova.glmmTMB(gModelRegion,type=3,component="zi")
-gMRanova_table_zipart
-
-######################
-
-gModelSpecies = glmmTMB(
-  WHG ~ SPECIES + REGION,
-  data = wfish,
-  ziformula = ~.,
-  family=ziGamma("log"),
-)
-print(summary(gModelSpecies),show.residuals=TRUE)
-
-##########################################################
-
-
-### RESULTS: No values under 0.05, no significant difference.
-
-
-######################### SPECIES 1979-2020+2024
-
-# VISUALZATION - Boxplot of Species for 2024
+# Boxplot of Species for 2024
 boxplot(wfish$WHG ~ wfish$SPECIES,
         main="Species Comparison of 2024 Samples",
         xlab="Species", ylab="Nematodes per 100g",
@@ -159,6 +114,75 @@ boxplot(wfish$WHG ~ wfish$SPECIES,
         col=c("pink" , "tomato", "#a7cdd6"),
         border=c("#f06790", "red", "#5894a3")
 )
+
+# Boxplot of Mastick data 
+boxplot(mast$whg ~ mast$salmon.species,
+        main="Species Comparison of Samples from 1982-2020\n(Mastick et al. 2024)",
+        xlab="Species", ylab="Nematodes per 100g",
+        col=c("gray", "pink", "tomato", "#a7cdd6"),
+        border=c("darkgray", "#f06790", "red", "#5894a3"))
+
+
+# Mastick WHG over time
+ggplot(mast, aes(x = year, y = whg, color = salmon.species)) +
+  geom_point() +
+  geom_labelsmooth(aes(label = salmon.species), fill = "white",
+                   method = "lm", formula = y ~ x,
+                   size = 3, linewidth = 1, boxlinewidth = 0.4) +
+  xlab ("Year") +
+  xlim (1979, 2020) +
+  theme_bw() + guides(color = 'none')
+
+# VISUALIZATION - Combined sets of WHG over time
+# wfish$year <- c(as.numeric("2024"))
+
+ggplot(combo, aes(x = year, y = whg, color = species)) +
+  geom_point() +
+  geom_labelsmooth(aes(label = species), fill = "white",
+                   method = "lm", formula = y ~ x,
+                   size = 3, linewidth = 1, boxlinewidth = 0.4) +
+  xlab ("Year") +
+  xlim (1979, 2024) +
+  theme_bw() + guides(color = 'none')
+
+# VISUALIZATION - Distributions of WHG per data set
+# Gardner 2024
+ggplot (wfish, aes(y = SPECIES, x = WHG)) +
+  stat_halfeye()
+
+# Mastick 1979-2020
+ggplot (mast, aes(y = salmon.species, x = whg)) +
+  stat_halfeye()
+
+# Combined 1979-2024
+ggplot (combo, aes(y = species, x = whg)) +
+  stat_halfeye()
+# This tells us the data is not normally distributed
+# and we need to use a zero-inflated gamma model.
+
+# VISUALIZATION - Data sets on box plot together
+ggplot(combo, aes(x=species, 
+                  y=whg, 
+                  fill=set,
+                  #colour = 'red',
+)) + 
+  scale_fill_manual(values = c("tomato", "#a7cdd6")) +
+  geom_boxplot() +
+  ylab ("Nematodes per 100g") +
+  xlab ("Species") 
+
+### FIGURE X - Combined data set box plot
+
+boxplot(combo$whg ~ combo$species,
+        #subset=(threemast$salmon.species!="Coho"),
+        main="Species Comparison of Combined Samples",
+        xlab="Species", ylab="Nematodes per 100g",
+        col=c("gray", "pink", "tomato", "#a7cdd6"),
+        border=c("darkgray", "#f06790", "red", "#5894a3"))
+
+##################################################
+# 3 - SUMMARY STATS
+##################################################
 
 # SUMMARY - Mastick
 as.numeric(mast$whg)
@@ -194,131 +218,10 @@ GStatsSum <- data.frame(
 )
 GStatsSum
 
-# VISUALIZATION - Boxplot of Mastick data 
-boxplot(mast$whg ~ mast$salmon.species,
-        main="Species Comparison of Samples from 1982-2020\n(Mastick et al. 2024)",
-        xlab="Species", ylab="Nematodes per 100g",
-        col=c("gray", "pink", "tomato", "#a7cdd6"),
-        border=c("darkgray", "#f06790", "red", "#5894a3"))
-
-
-
-# VISUALIZATION - Mastick WHG over time
-ggplot(mast, aes(x = year, y = whg, color = salmon.species)) +
-  geom_point() +
-  geom_labelsmooth(aes(label = salmon.species), fill = "white",
-                   method = "lm", formula = y ~ x,
-                   size = 3, linewidth = 1, boxlinewidth = 0.4) +
-  xlab ("Year") +
-  xlim (1979, 2020) +
-  theme_bw() + guides(color = 'none')
-
-# VISUALIZATION - Combined sets of WHG over time
-#wfish$year <- c(as.numeric("2024"))
-
-
-
-ggplot(combo, aes(x = year, y = whg, color = species)) +
-  geom_point() +
-  geom_labelsmooth(aes(label = species), fill = "white",
-                   method = "lm", formula = y ~ x,
-                   size = 3, linewidth = 1, boxlinewidth = 0.4) +
-  xlab ("Year") +
-  xlim (1979, 2024) +
-  theme_bw() + guides(color = 'none')
-
-#########################################################
-
-
-# VISUALIZATION - Distributions of WHG per data set
-# Gardner 2024
-ggplot (wfish, aes(y = SPECIES, x = WHG)) +
-  stat_halfeye()
-
-# Mastick 1979-2020
-ggplot (mast, aes(y = salmon.species, x = whg)) +
-  stat_halfeye()
-
-# Combined 1979-2024
-ggplot (combo, aes(y = species, x = whg)) +
-  stat_halfeye()
-# This tells us the data is not normally distributed
-# and we need to use a zero-inflated gamma model.
-
-
-# TEST - GLMM Model for Species Differences
-
-SpeciesModel = glmmTMB(  
-  whg ~ species + (1|year), 
-  data = combo,
-  ziformula = ~.,
-  family=ziGamma("log"))
-print(summary(SpeciesModel),show.residuals=TRUE)
-
-SpAIC <- AIC(SpeciesModel)
-SpAIC
-
-# VISUALIZATION - Data sets on box plot together
-ggplot(combo, aes(x=species, 
-                  y=whg, 
-                  fill=set,
-                  #colour = 'red',
-)) + 
-  scale_fill_manual(values = c("tomato", "#a7cdd6")) +
-  geom_boxplot() +
-  ylab ("Nematodes per 100g") +
-  xlab ("Species") 
-
-### FIGURE X - Combined data set box plot
-
-boxplot(combo$whg ~ combo$species,
-        #subset=(threemast$salmon.species!="Coho"),
-        main="Species Comparison of Combined Samples",
-        xlab="Species", ylab="Nematodes per 100g",
-        col=c("gray", "pink", "tomato", "#a7cdd6"),
-        border=c("darkgray", "#f06790", "red", "#5894a3"))
-
-##############################################
-
-### RESULTS - Zero-inflated Gamma ANOVA
-
-AnovaSpecies = glmmTMB(
-  WHG ~ SPECIES,
-  data = wfish,
-  ziformula = ~.,
-  family=ziGamma("log"),
-)
-
-anova_table_gammapart = glmmTMB:::Anova.glmmTMB(AnovaSpecies,type=3,component="cond")
-anova_table_gammapart
-
-
-anova_table_zipart = glmmTMB:::Anova.glmmTMB(AnovaSpecies,type=3,component="zi")
-anova_table_zipart
-
-emm_cond = emmeans(AnovaSpecies, ~SPECIES, component="cond")
-tukey_cond = pairs(emm_cond, adjust = "tukey")
-tukey_cond
-
-emm_zi = emmeans(AnovaSpecies, ~SPECIES, component="zi")
-tukey_zi = pairs(emm_zi, adjust = "tukey")
-tukey_zi
-
-
-# Species Chisq Value 0.01942 < 0.05 
-
-
-# Significant diff between sockeye + pink
-# Significant diff between sockeye + coho
-# No other significant differences
-
-############# MODEL LIST
-
 
 ##################################################
-# 3 - MODEL COMPARISONS
+# 4 - MODEL COMPARISONS
 ##################################################
-
 
 # Conway-Maxwell Poisson, compois(link = "log")
 modConway = glmmTMB(  
@@ -348,12 +251,9 @@ modZiGamIn = glmmTMB(
   ziformula = ~.,
   family=ziGamma("inverse"))
 
-
 # best fit
-
 models <- list(modTwee, modZiGam)
 model_names <- c("Tweedie", "ziGamma Log")
-
 
 residual_summaries <- map2_df(models, model_names, function(model, name) {
   sim <- simulateResiduals(fittedModel = model, plot = FALSE)
@@ -372,16 +272,16 @@ residual_summaries %>%
 
 modFinal <- modTwee
 
-
 simulateResiduals(fittedModel = modFinal, plot = TRUE)
 summary(modFinal)
 plot(parameters(modFinal))
 
 
 ##################################################
-# 3 - FINAL MODEL USED TO EVAL VARIABLES
+# 5 - MODEL CHOICE & TUKEY'S TEST
 ##################################################
 
+## Regional comparison using 2024:
 
 gModTwee = glmmTMB(  
   WHG ~ REGION, 
@@ -390,14 +290,12 @@ gModTwee = glmmTMB(
 
 print(summary(gModTwee),show.residuals=TRUE)
 
-##################################################################################
-
+## Species comparison using 2000-2020 + 2024:
 
 cModAnovaSpecies = glmmTMB(
   whg ~ species + (1|year),
   data = comboModern,
-  ziformula = ~.,
-  family=ziGamma("log"),
+  family=tweedie("log"),
 )
 print(summary(cModAnovaSpecies),show.residuals=TRUE)
 
@@ -416,8 +314,7 @@ emm_zi = emmeans(cModAnovaSpecies, ~species, component="zi")
 tukey_zi = pairs(emm_zi, adjust = "tukey")
 tukey_zi
 
-
-##################################################################################
+## Species comparison using <2000:
 
 cHistAnovaSpecies = glmmTMB(
   whg ~ species,
@@ -443,7 +340,7 @@ tukey_zi = pairs(emm_zi, adjust = "tukey")
 tukey_zi
 
 
-###############################################
+## Species comparison using 2024: 
 
 gModTwee = glmmTMB(  
   WHG ~ SPECIES, 
